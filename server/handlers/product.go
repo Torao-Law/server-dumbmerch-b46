@@ -1,13 +1,19 @@
 package handlers
 
 import (
+	"context"
 	productdto "dumbmerch/dto/product"
 	dto "dumbmerch/dto/result"
 	"dumbmerch/models"
 	"dumbmerch/repositories"
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"os"
 	"strconv"
+
+	"github.com/cloudinary/cloudinary-go/v2"
+	"github.com/cloudinary/cloudinary-go/v2/api/uploader"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/golang-jwt/jwt/v4"
@@ -88,16 +94,30 @@ func (h *handlerProduct) CreateProduct(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, dto.ErrorResult{Code: http.StatusInternalServerError, Message: err.Error()})
 	}
 
+	var ctx = context.Background()
+	var CLOUD_NAME = os.Getenv("CLOUD_NAME")
+	var API_KEY = os.Getenv("API_KEY")
+	var API_SECRET = os.Getenv("API_SECRET")
 	userLogin := c.Get("userLogin")
-	userId := userLogin.(jwt.MapClaims)["id"].(float64)
 
+	// Add your Cloudinary credentials ...
+	cld, _ := cloudinary.NewFromParams(CLOUD_NAME, API_KEY, API_SECRET)
+
+	// Upload file to Cloudinary ...
+	resp, err := cld.Upload.Upload(ctx, dataFile, uploader.UploadParams{Folder: "dumbmerch-app"})
+
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+
+	userId := userLogin.(jwt.MapClaims)["id"].(float64)
 	categories, _ := h.ProductRepository.FindCategoriesById(request.CategoryID)
 
 	product := models.Product{
 		Name:     request.Name,
 		Desc:     request.Desc,
 		Price:    request.Price,
-		Image:    request.Image,
+		Image:    resp.SecureURL,
 		Qty:      request.Qty,
 		Category: categories,
 		UserID:   int(userId),
